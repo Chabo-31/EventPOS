@@ -4,6 +4,7 @@ import { liveQuery } from 'dexie'
 import { completeSale } from './services/checkout'
 import type { Sale, SaleLine } from './models/records'
 import EventManager from './pages/EventManager'
+import BackupManager from './pages/BackupManager'
 import InventoryManager from './pages/InventoryManager'
 import { loadEvents, eventItems, canAdd, itemKey } from './services/events'
 import type { EventData, EventItem } from './services/events'
@@ -112,7 +113,7 @@ function App() {
         </div></>}
         {tab === '在庫' && data && <InventoryManager key={active?.id??''} eventId={active?.id??''} items={products} onMutation={()=>{reset();setReceipt(null);setSaleError('')}} />}
         {tab === 'イベント' && data && <EventManager data={data} />}
-        {tab === '設定' && <section className="panel"><h2>設定</h2><CashPresetSettings values={presets}/>{['バックアップ出力', 'インポート'].map(label => <div className="line setting-row" key={label}><span>{label}</span><button disabled>準備中</button></div>)}<p className="muted">各機能は後続Phaseで実装します。</p><h3>データベース診断</h3><button onClick={() => void runDiagnostics()} disabled={dbBusy}>{dbBusy ? "診断中…" : "保存・復元テスト"}</button><div role="status" aria-live="polite">{dbReport.map((line, i) => <p key={i}>{line}</p>)}</div></section>}
+        {tab === '設定' && <section className="panel"><h2>設定</h2><CashPresetSettings values={presets}/><BackupManager data={data} onRestore={()=>{reset();setReceipt(null);setSaleError('')}} /><h3>データベース診断</h3><button onClick={() => void runDiagnostics()} disabled={dbBusy}>{dbBusy ? "診断中…" : "保存・復元テスト"}</button><div role="status" aria-live="polite">{dbReport.map((line, i) => <p key={i}>{line}</p>)}</div></section>}
       </main>
       <nav className="navigation" aria-label="メインメニュー">{tabs.map(t => <button key={t} aria-current={tab === t ? 'page' : undefined} className={tab === t ? 'active' : ''} disabled={saving} onClick={() => { if (t === 'イベント') { reset();setReceipt(null);setSaleError('') }; setTab(t) }}><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={navPaths[t]} /></svg><span>{t}</span></button>)}</nav>
     </div>
