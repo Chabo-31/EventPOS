@@ -4,6 +4,9 @@ import type { Sale } from '../models/records'
 export async function loadInventory(eventId: string) {
   return db.transaction('r', [db.events, db.products, db.eventProducts, db.sales, db.movements], async () => ({
     event: await db.events.get(eventId),
+    events: await db.events.orderBy('date').reverse().toArray(),
+    allProducts: await db.products.toArray(),
+    allSales: (await db.sales.toArray()).sort((a,b)=>b.timestamp.localeCompare(a.timestamp)),
     products: await db.products.where('eventId').equals(eventId).toArray(),
     links: await db.eventProducts.where('eventId').equals(eventId).toArray(),
     sales: (await db.sales.where('eventId').equals(eventId).toArray()).sort((a,b)=>b.timestamp.localeCompare(a.timestamp)),
