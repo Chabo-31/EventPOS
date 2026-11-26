@@ -58,7 +58,7 @@ export default function ProductManager({ eventId }: { eventId: string }) {
       <input id="master-photo" type="file" accept="image/*" onChange={e => { const file = e.target.files?.[0]; e.target.value = ''; if (file) void perform(async () => setPhoto(await resizePhoto(file)), '画像を選択しました（保存前）') }} />
       <button type="button" onClick={() => setPhoto(null)}>写真を削除</button>
       {kind === 'bundle' && <><h3>セット構成</h3>{catalog.products.length === 0 && <p>先に単品商品を登録してください。</p>}{catalog.products.map(p => <div className="master-component" key={p.id}><label htmlFor={'component-' + p.id}>{p.name}</label><NumberInput id={'component-' + p.id} inputMode="numeric" min="0" max="9999" step="1" value={draft.components[p.id] ?? ''} placeholder="0" onValueChange={value => setDraft(d => ({ ...d, components: { ...d.components, [p.id]: value } }))} /></div>)}</>}
-      <div className="actions"><button type="button" onClick={() => setEditing(false)}>取消</button><button className="primary" type="submit">保存</button></div>
+      <div className="actions"><button type="button" onClick={() => setEditing(false)}>キャンセル</button><button className="primary" type="submit">保存</button></div>
       </fieldset>
     </form> : <><div className="line"><strong>{rows.length}件</strong><button className="primary" disabled={busy} onClick={() => start()}>＋ 新規登録</button></div>
       {rows.length === 0 && <p className="muted">登録されている商品はありません。</p>}
