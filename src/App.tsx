@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import './App.css'
+import { checkDatabase } from './database/diagnostics'
 
 const products = [
   { id: 1, name: 'アクリルスタンド', price: 1500, stock: 30, color: '#e5d9f0' },
@@ -18,6 +19,15 @@ const navPaths: Record<Tab, string> = {
 const yen = (n: number) => '¥' + n.toLocaleString('ja-JP')
 
 function App() {
+  const [dbBusy, setDbBusy] = useState(false)
+  const [dbReport, setDbReport] = useState<string[]>([])
+  const runDiagnostics = async () => {
+    setDbBusy(true)
+    setDbReport([])
+    try { setDbReport(await checkDatabase()) }
+    catch (error) { setDbReport(['診断失敗：' + String(error)]) }
+    finally { setDbBusy(false) }
+  }
   const [tab, setTab] = useState<Tab>('会計')
   const [qty, setQty] = useState([0, 0, 0, 0])
   const [cashOpen, setCashOpen] = useState(false)
@@ -51,7 +61,7 @@ function App() {
         </div>}
         {tab === '在庫' && <section className="panel"><h2>在庫管理</h2><p className="muted">在庫追加は後続Phaseで実装します。</p>{products.map(p => <div className="inventory-row" key={p.id}><span>{p.name}</span><strong>{p.stock}点</strong><button disabled>在庫追加</button></div>)}</section>}
         {tab === 'イベント' && <section className="panel"><h2>イベント設定</h2><label htmlFor="event-name">イベント名</label><input id="event-name" value={eventName} onChange={e => setEventName(e.target.value)} /><label htmlFor="event-date">開催日</label><input id="event-date" type="date" value={eventDate} onChange={e => setEventDate(e.target.value)} /><h3>紐づけ商品（サンプル）</h3>{products.map(p => <div className="line" key={p.id}><span>{p.name}</span><span>{yen(p.price)}</span></div>)}<p className="muted">入力内容は保存されません。</p></section>}
-        {tab === '設定' && <section className="panel"><h2>設定</h2>{['商品登録・編集', 'セット商品登録', 'バックアップ出力', 'インポート'].map(label => <div className="line setting-row" key={label}><span>{label}</span><button disabled>準備中</button></div>)}<p className="muted">各機能は後続Phaseで実装します。</p></section>}
+        {tab === '設定' && <section className="panel"><h2>設定</h2>{['商品登録・編集', 'セット商品登録', 'バックアップ出力', 'インポート'].map(label => <div className="line setting-row" key={label}><span>{label}</span><button disabled>準備中</button></div>)}<p className="muted">各機能は後続Phaseで実装します。</p><h3>データベース診断</h3><button onClick={() => void runDiagnostics()} disabled={dbBusy}>{dbBusy ? "診断中…" : "保存・復元テスト"}</button><div role="status" aria-live="polite">{dbReport.map((line, i) => <p key={i}>{line}</p>)}</div></section>}
       </main>
       <nav className="navigation" aria-label="メインメニュー">{tabs.map(t => <button key={t} aria-current={tab === t ? 'page' : undefined} className={tab === t ? 'active' : ''} onClick={() => setTab(t)}><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={navPaths[t]} /></svg><span>{t}</span></button>)}</nav>
     </div>
