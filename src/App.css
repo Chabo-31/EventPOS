@@ -156,3 +156,15 @@ h2 { margin-bottom: 10px; }
 @media(max-width:420px){.event-toolbar {gap:4px;} .event-toolbar button {padding:6px 8px;font-size:12px;}}
 
 .actions.merge-actions { grid-template-columns:repeat(2,minmax(0,1fr)); }
+
+/* Destructive actions: consistent warning palette */
+button.danger-outline { background:#fff1f0; border-color:#dba4a0; color:#b42318; font-weight:600; }
+button.danger-outline:not(:disabled):hover { background:#ffe4e2; border-color:#b42318; }
+button.danger { background:#b42318; border-color:#b42318; color:#fff; font-weight:700; }
+button.danger:not(:disabled):hover { background:#921d15; border-color:#921d15; }
+button.danger:disabled { opacity:1; background:#dcb1ae; border-color:#dcb1ae; color:#fff; }
+.danger-icon { vertical-align:-3px; margin-right:5px; flex-shrink:0; }
+.danger-heading { color:#b42318; }
+.danger-warning { background:#fff1f0; border:1px solid #e8b6b2; color:#b42318; padding:12px; border-radius:9px; margin:10px 0; }
+.danger-warning p { margin:6px 0 0; font-size:13px; }
+.actions.danger-actions { grid-template-columns:repeat(2,minmax(0,1fr)); }
