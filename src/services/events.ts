@@ -1,5 +1,5 @@
 import { db } from '../database/db'
-import type { EventRecord, EventProduct, EventBundle } from '../models/records'
+import type { EventRecord } from '../models/records'
 
 export async function loadEvents() {
   return db.transaction('r', [db.events, db.products, db.bundles, db.images, db.eventProducts, db.eventBundles, db.settings], async () => ({
@@ -13,8 +13,8 @@ export async function loadEvents() {
   }))
 }
 export type EventData = Awaited<ReturnType<typeof loadEvents>>
-export type EventDraft = { name: string; date: string; openingCash: string; products: Record<string, { stock: string; price: string }>; bundles: Record<string, string> }
-export const emptyEvent = (): EventDraft => ({ name: '', date: '', openingCash: '0', products: {}, bundles: {} })
+export type EventDraft = { name: string; date: string; openingCash: string }
+export const emptyEvent = (): EventDraft => ({ name: '', date: '', openingCash: '0' })
 function integer(value: string, label: string, max = 99999999) {
   const n = Number(value)
   if (!value.trim() || !Number.isSafeInteger(n) || n < 0 || n > max) throw new Error(label + 'は0～' + max.toLocaleString() + 'の整数で入力してください')
@@ -32,29 +32,14 @@ export async function saveEvent(id: string | null, draft: EventDraft) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(draft.date) || Number.isNaN(Date.parse(draft.date)) || new Date(draft.date).toISOString().slice(0,10) !== draft.date) throw new Error('開催日を入力してください')
   const openingCash = integer(draft.openingCash, '釣銭準備金')
   const eventId = id ?? crypto.randomUUID()
-  const links: EventProduct[] = Object.entries(draft.products).map(([productId, p]) => {
-    const stock = integer(p.stock, '初期在庫', 999999)
-    return { eventId, productId, initialStock: stock, stock, price: integer(p.price, '販売価格') }
-  })
-  const bundleLinks: EventBundle[] = Object.entries(draft.bundles).map(([bundleId, price]) => ({ eventId, bundleId, price: integer(price, 'セット価格') }))
-  await db.transaction('rw', [db.events, db.products, db.bundles, db.eventProducts, db.eventBundles, db.movements, db.sales, db.settings], async () => {
+  await db.transaction('rw', [db.events, db.sales, db.movements, db.settings], async () => {
     if (id && !await db.events.get(id)) throw new Error('イベントが見つかりません')
-    if (await db.sales.where('eventId').equals(eventId).count() || (await db.movements.where('eventId').equals(eventId).toArray()).some(m => m.reason !== 'initial')) throw new Error('販売・在庫操作後のイベント設定変更はできません')
-    for (const link of links) if (!await db.products.get(link.productId)) throw new Error('商品が見つかりません')
-    for (const link of bundleLinks) {
-      const bundle = await db.bundles.get(link.bundleId)
-      if (!bundle || !bundle.components.length || bundle.components.some(c => !links.some(p => p.productId === c.productId))) throw new Error('セットの構成商品もすべて紐づけてください')
-    }
+    if (id && (await db.sales.where('eventId').equals(id).count() || (await db.movements.where('eventId').equals(id).toArray()).some(m=>m.reason!=='initial'))) throw new Error('販売・在庫操作後のイベント設定変更はできません')
     const event: EventRecord = { id: eventId, name, date: draft.date, openingCash }
     await db.events.put(event)
-    await db.eventProducts.where('eventId').equals(eventId).delete()
-    await db.eventBundles.where('eventId').equals(eventId).delete()
-    await db.movements.where('eventId').equals(eventId).delete()
-    await db.eventProducts.bulkPut(links)
-    await db.eventBundles.bulkPut(bundleLinks)
-    await db.movements.bulkAdd(links.map(p => ({ id: crypto.randomUUID(), eventId, productId: p.productId, delta: p.initialStock, reason: 'initial' as const, timestamp: new Date().toISOString() })))
     await db.settings.put({ key: 'activeEvent', value: eventId })
   })
+  return eventId
 }
 export function eventItems(data: EventData, eventId: string) {
   const links = data.links.filter(p => p.eventId === eventId)
@@ -75,4 +60,13 @@ export function canAdd(items: EventItem[], qty: Record<string, number>, item: Ev
   const used: Record<string, number> = {}
   for (const p of items) for (const c of p.components) used[c.productId] = (used[c.productId] ?? 0) + c.quantity * (qty[itemKey(p)] ?? 0)
   return item.components.length > 0 && item.components.every(c => (used[c.productId] ?? 0) + c.quantity <= (items.find(p => p.kind === 'product' && p.id === c.productId)?.stock ?? 0))
+}
+
+export async function copyEvent(source:string,draft:EventDraft,mode:import('./catalog').StockMode){
+  const {copyCatalog}=await import('./catalog')
+  return db.transaction('rw',[db.events,db.products,db.bundles,db.images,db.eventProducts,db.eventBundles,db.movements,db.sales,db.settings],async()=>{
+    const id=await saveEvent(null,draft)
+    await copyCatalog(source,id,mode)
+    return id
+  })
 }
