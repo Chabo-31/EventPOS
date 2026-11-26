@@ -29,7 +29,7 @@ export default function ProductManager({ eventId }: { eventId: string }) {
     const sub = liveQuery(() => loadCatalog(eventId)).subscribe({ next: setCatalog, error: e => setMessage('読み込み失敗：' + String(e)) })
     return () => sub.unsubscribe()
   }, [eventId])
-  const rows = kind === 'product' ? catalog.products : catalog.bundles
+  const rows: Item[] = kind === 'product' ? catalog.products : catalog.bundles
   const imageFor = (item?: Item) => catalog.images.find(i => i.id === item?.imageId)?.blob
   const start = (item?: Item) => {
     setId(item?.id ?? null)
