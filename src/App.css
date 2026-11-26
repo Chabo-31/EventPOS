@@ -130,3 +130,16 @@ h2 { margin-bottom: 10px; }
 .inventory-notice { color:#24583a; background:#eef6f0; padding:10px; border-radius:8px; }
 .danger { background:#a52620; border-color:#a52620; color:#fff; }
 @media(max-width:420px){.inventory-tabs {grid-template-columns:repeat(2,minmax(0,1fr));}.inventory-row {gap:8px;}.inventory-row button {padding:6px 8px;}}
+
+/* Sales filter, selected event, and checkout keypad */
+.event-row.event-selected { background:#e9f1fa; border:1px solid var(--accent); border-left:4px solid var(--accent); border-radius:10px; padding:12px; margin:6px 0; }
+.event-active-label { display:inline-block; margin-left:8px; padding:3px 8px; border-radius:6px; background:var(--accent); color:white; font-size:12px; font-weight:700; }
+.selected-event-button:disabled { opacity:1; background:var(--accent); color:white; border-color:var(--accent); font-weight:700; }
+.sales-filter { margin-bottom:14px!important; }
+.event-sales-row button { width:100%; display:flex; align-items:center; justify-content:space-between; gap:12px; text-align:left; margin:4px 0; }
+.event-sales-row small { display:block; color:var(--muted); margin-top:4px; }
+.cash-keypad { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:5px; margin:8px 0; }
+.cash-keypad button { font-size:20px; font-weight:600; min-height:44px; padding:4px; }
+.cash-keypad button:first-child { grid-column:auto; }
+.cash-preset-settings fieldset { border:0; padding:0; margin:0; min-width:0; }
+.cash-preset-settings .actions { margin:10px 0; }
