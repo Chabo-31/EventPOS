@@ -1,6 +1,8 @@
 import NumberInput from './components/NumberInput'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { liveQuery } from 'dexie'
+import { completeSale } from './services/checkout'
+import type { Sale, SaleLine } from './models/records'
 import EventManager from './pages/EventManager'
 import { loadEvents, eventItems, canAdd, itemKey } from './services/events'
 import type { EventData, EventItem } from './services/events'
@@ -50,13 +52,18 @@ function App() {
   const qty = cart.eventId === active?.id ? cart.qty : {}
   const [cashOpen, setCashOpen] = useState(false)
   const [cash, setCash] = useState('0')
+  const [saving,setSaving]=useState(false)
+  const [receipt,setReceipt]=useState<Sale|null>(null)
+  const [saleError,setSaleError]=useState('')
+  const gate=useRef(false)
   const amount = (p: EventItem) => qty[itemKey(p)] ?? 0
   const total = products.reduce((sum, p) => sum + p.price * amount(p), 0)
   const count = products.reduce((sum, p) => sum + amount(p), 0)
   const change = Number(cash) - total
-  const valid = count > 0 && cash !== '' && Number.isSafeInteger(Number(cash)) && change >= 0
+  const valid = !!active && !saving && count > 0 && Number.isSafeInteger(total) && cash !== '' && Number.isSafeInteger(Number(cash)) && Number(cash) >= 0 && change >= 0
   const adjust = (p: EventItem, delta: number) => {
-    if (!active) return
+    if (!active || gate.current) return
+    setReceipt(null); setSaleError('')
     setCart(prev => {
       const current = prev.eventId === active.id ? prev.qty : {}
       if (delta > 0 && !canAdd(products, current, p)) return prev
@@ -65,29 +72,40 @@ function App() {
   }
   const reset = () => { setCart({ eventId: active?.id ?? '', qty: {} }); setCash('0'); setCashOpen(false) }
 
+  const confirmSale=async()=>{
+    if(!active||!valid||gate.current)return
+    gate.current=true;setSaving(true);setSaleError('');setReceipt(null)
+    const lines:SaleLine[]=products.filter(p=>amount(p)>0).map(p=>({itemId:p.id,kind:p.kind,name:p.name,unitPrice:p.price,quantity:amount(p),components:p.components}))
+    try{
+      const sale=await completeSale(active.id,crypto.randomUUID(),lines,Number(cash),total)
+      reset();setReceipt(sale)
+    }catch(e){setSaleError(e instanceof Error?e.message:String(e))}
+    finally{gate.current=false;setSaving(false)}
+  }
+
   return (
     <div className="app-shell">
-      <header className="app-header"><div><h1>EventPOS</h1><p>{active ? active.name + ' · ' + active.date : 'イベント未選択'}</p></div><span className="preview-label">会計保存は未実装</span></header>
+      <header className="app-header"><div><h1>EventPOS</h1><p>{active ? active.name + ' · ' + active.date : 'イベント未選択'}</p></div><span className="preview-label">現金決済</span></header>
       <main className="workspace">{loadError && <p role="alert">読み込み失敗：{loadError}</p>}{!data && !loadError && <p>読み込み中…</p>}
-        {tab === '会計' && <div className="checkout">
+        {tab === '会計' && <>{receipt && receipt.eventId===active?.id && <div className="sale-receipt" role="status"><div><strong>会計完了</strong><span>売上 {yen(receipt.total)} ／ お釣り {yen(receipt.change)}</span></div><button onClick={()=>setReceipt(null)}>閉じる</button></div>}{saleError && <p className="sale-error" role="alert">{saleError}</p>}<div className="checkout">
           <section className="catalog"><h2>商品選択</h2>{!active && <p className="muted">イベントタブで販売対象を登録・選択してください。</p>}{active && !products.length && <p className="muted">イベントタブで商品を登録してください。</p>}<div className="product-grid">{products.map(p => <article key={itemKey(p)} className={'product-card' + (amount(p) ? ' selected' : '')}>
-            <button className="product-image"  onClick={() => adjust(p, 1)} disabled={!canAdd(products, qty, p)} aria-label={p.name + 'を追加'}><ItemPhoto blob={p.image} /></button>
+            <button className="product-image"  onClick={() => adjust(p, 1)} disabled={saving || !canAdd(products, qty, p)} aria-label={p.name + 'を追加'}><ItemPhoto blob={p.image} /></button>
             <div className="product-body"><h3>{p.name}{p.kind === "bundle" && <small> セット</small>}</h3><div className="product-meta"><strong>{yen(p.price)}</strong><small>在庫 {p.stock}</small></div>
-            <div className="quantity"><button onClick={() => adjust(p, -1)} disabled={!amount(p)} aria-label={p.name + 'を減らす'}>−</button><strong>{amount(p)}</strong><button onClick={() => adjust(p, 1)} disabled={!canAdd(products, qty, p)} aria-label={p.name + 'を増やす'}>＋</button></div></div>
+            <div className="quantity"><button onClick={() => adjust(p, -1)} disabled={saving || !amount(p)} aria-label={p.name + 'を減らす'}>−</button><strong>{amount(p)}</strong><button onClick={() => adjust(p, 1)} disabled={saving || !canAdd(products, qty, p)} aria-label={p.name + 'を増やす'}>＋</button></div></div>
           </article>)}</div></section>
           <section className={"panel checkout-summary" + (cashOpen ? " expanded" : "")}><button className="mobile-summary-toggle" onClick={() => setCashOpen(v => !v)} aria-expanded={cashOpen}><span>合計 {count}点</span><strong>{yen(total)}</strong><span>{cashOpen ? "閉じる" : "会計へ"}</span></button><div className="summary-details"><h2>会計内容</h2><div className="cart-lines">{count === 0 ? <p className="muted">商品を選択してください</p> : products.map(p => amount(p) > 0 && <div className="line" key={itemKey(p)}><span>{p.name} × {amount(p)}</span><strong>{yen(p.price * amount(p))}</strong></div>)}</div>
             <div className="line total"><span>合計金額 · {count}点</span><strong>{yen(total)}</strong></div>
-            <label htmlFor="cash">お預かり金額</label><NumberInput id="cash" min="0" step="1" inputMode="numeric" value={cash} onValueChange={value => setCash(value)} placeholder="金額を入力" />
-            <div className="cash-buttons">{[1000, 5000, 10000].map(n => <button key={n} onClick={() => setCash(String((Number(cash) || 0) + n))}>+{n.toLocaleString()}</button>)}<button onClick={() => setCash(String(total))}>丁度</button></div>
+            <label htmlFor="cash">お預かり金額</label><NumberInput disabled={saving} id="cash" min="0" step="1" inputMode="numeric" value={cash} onValueChange={value => setCash(value)} placeholder="金額を入力" />
+            <div className="cash-buttons">{[1000, 5000, 10000].map(n => <button disabled={saving} key={n} onClick={() => setCash(String((Number(cash) || 0) + n))}>+{n.toLocaleString()}</button>)}<button disabled={saving} onClick={() => setCash(String(total))}>丁度</button></div>
             <div className={'line change' + (cash !== '' && change < 0 ? ' shortage' : '')}><span>{cash !== '' && change < 0 ? '不足金額' : 'お釣り'}</span><strong>{cash === '' ? '—' : yen(Math.abs(change))}</strong></div>
-            <div className="actions"><button onClick={reset}>リセット</button><button className="primary" disabled={!valid} onClick={() => { window.alert('GUIプレビュー：会計データは保存されません。'); reset() }}>会計確定</button></div></div>
+            <div className="actions"><button disabled={saving} onClick={()=>{reset();setReceipt(null);setSaleError('')}}>リセット</button><button className="primary" disabled={!valid} onClick={() => void confirmSale()}>{saving ? '保存中…' : '会計確定'}</button></div></div>
           </section>
-        </div>}
+        </div></>}
         {tab === '在庫' && <section className="panel"><h2>在庫管理</h2><p className="muted">在庫追加は後続Phaseで実装します。</p>{active && <p>釣銭準備金：{yen(active.openingCash)}</p>}{products.map(p => <div className="inventory-row" key={itemKey(p)}><span>{p.name}</span><strong>{p.stock}点</strong><button disabled>在庫追加</button></div>)}</section>}
         {tab === 'イベント' && data && <EventManager data={data} />}
         {tab === '設定' && <section className="panel"><h2>設定</h2>{['バックアップ出力', 'インポート'].map(label => <div className="line setting-row" key={label}><span>{label}</span><button disabled>準備中</button></div>)}<p className="muted">各機能は後続Phaseで実装します。</p><h3>データベース診断</h3><button onClick={() => void runDiagnostics()} disabled={dbBusy}>{dbBusy ? "診断中…" : "保存・復元テスト"}</button><div role="status" aria-live="polite">{dbReport.map((line, i) => <p key={i}>{line}</p>)}</div></section>}
       </main>
-      <nav className="navigation" aria-label="メインメニュー">{tabs.map(t => <button key={t} aria-current={tab === t ? 'page' : undefined} className={tab === t ? 'active' : ''} onClick={() => { if (t === 'イベント') reset(); setTab(t) }}><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={navPaths[t]} /></svg><span>{t}</span></button>)}</nav>
+      <nav className="navigation" aria-label="メインメニュー">{tabs.map(t => <button key={t} aria-current={tab === t ? 'page' : undefined} className={tab === t ? 'active' : ''} disabled={saving} onClick={() => { if (t === 'イベント') { reset();setReceipt(null);setSaleError('') }; setTab(t) }}><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={navPaths[t]} /></svg><span>{t}</span></button>)}</nav>
     </div>
   )
 }
