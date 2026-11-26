@@ -143,3 +143,10 @@ h2 { margin-bottom: 10px; }
 .cash-keypad button:first-child { grid-column:auto; }
 .cash-preset-settings fieldset { border:0; padding:0; margin:0; min-width:0; }
 .cash-preset-settings .actions { margin:10px 0; }
+
+.backup-manager { border-top:1px solid var(--border); margin-top:16px; padding-top:8px; }
+.backup-manager > button { margin:10px 0; }
+.backup-manager input[type=file] { margin-bottom:10px; }
+.backup-preview { border:1px solid var(--border); border-radius:10px; padding:12px; margin:12px 0; background:#f3f5f8; }
+.backup-preview h3 { margin-top:0; }
+.backup-preview .muted { margin:10px 0; }
