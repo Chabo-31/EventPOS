@@ -79,7 +79,7 @@ export default function InventoryManager({eventId,items,onMutation}:{eventId:str
         <p className="muted">{data.events.find(e=>e.id===s.eventId)?.name??"不明なイベント"}</p><div className="line"><span>{time(s.timestamp)}</span><strong>{yen(s.total)}</strong></div>
         {s.lines.map(l=><div className="line" key={l.kind+':'+l.itemId}><span>{l.name} × {l.quantity}</span><span>{yen(l.unitPrice*l.quantity)}</span></div>)}
         <p className="muted">預かり {yen(s.cash)} ／ お釣り {yen(s.change)}</p>
-        {s.cancelledAt?<p className="muted">キャンセル済み：{time(s.cancelledAt)}</p>:<button disabled={busy} onClick={()=>{setPendingCancel(s.id);setError('');setMessage('')}}>会計キャンセル</button>}
+        {s.cancelledAt?<p className="muted">キャンセル済み：{time(s.cancelledAt)}</p>:<button className="danger-outline" disabled={busy} onClick={()=>{setPendingCancel(s.id);setError('');setMessage('')}}>会計キャンセル</button>}
         {pending?.id===s.id&&<div className="cancel-confirm"><strong>{yen(s.total)}の会計をキャンセルしますか？</strong><p>実際の返金は手動で行ってください。売上から除外し、販売時の単品在庫を復元します。</p><div className="actions"><button disabled={busy} onClick={()=>setPendingCancel(null)}>キャンセル</button><button className="danger" disabled={busy} onClick={()=>void run(async()=>{await cancelSale(s.eventId,s.id);setPendingCancel(null)},'会計をキャンセルしました')}>キャンセル確定</button></div></div>}
       </article>)}
     </>}
