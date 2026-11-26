@@ -80,3 +80,20 @@ h2 { margin-bottom: 10px; }
   .checkout { padding-bottom: 4px; }
 }
 @media (max-width: 360px) { .quantity { grid-template-columns: 44px minmax(0, 1fr) 44px; } .product-body { padding: 6px; } }
+
+/* Phase 3: product master */
+.master-manager { margin-bottom: 20px; }
+.master-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+.master-form { max-width: 620px; margin: 12px auto; }
+.master-form fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+.master-form input[type=file] { margin: 8px 0; }
+.master-form .actions { margin-top: 16px; }
+.master-photo { width: 76px; height: 76px; border-radius: 8px; object-fit: contain; background: #eef2f6; flex-shrink: 0; }
+.master-photo.placeholder { display: grid; place-items: center; color: var(--muted); font-size: 12px; }
+.master-form .master-photo { width: 140px; height: 140px; }
+.master-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.master-info { display: grid; gap: 4px; flex: 1; min-width: 100px; overflow-wrap: anywhere; }
+.master-info small { color: var(--muted); }
+.master-buttons { display: flex; flex-wrap: wrap; gap: 4px; }
+.master-component { display: grid; grid-template-columns: minmax(0,1fr) 90px; gap: 10px; align-items: center; margin: 8px 0; }
+@media(max-width: 600px) { .master-buttons { flex-basis: 100%; justify-content: flex-end; } }
