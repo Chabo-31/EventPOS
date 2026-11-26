@@ -58,7 +58,7 @@ function App() {
   const [presets,setPresets]=useState<number[]>(defaultPresets)
   useEffect(()=>{const sub=liveQuery(async()=>readPresets((await db.settings.get('cashPresets'))?.value)).subscribe({next:setPresets,error:e=>setLoadError(String(e))});return ()=>sub.unsubscribe()},[])
   const cashLimit=999999999
-  const enterCash=(key:string)=>{if(gate.current)return;setCash(prev=>{const digits=/^\\d+$/.test(prev)?prev:'0';if(key==='C')return '0';if(key==='⌫')return digits.slice(0,-1)||'0';const n=Number(digits+key);return Number.isSafeInteger(n)&&n<=cashLimit?String(n):prev})}
+  const enterCash=(key:string)=>{if(gate.current)return;setCash(prev=>{const digits=/^\d+$/.test(prev)?prev:'0';if(key==='C')return '0';if(key==='⌫')return digits.slice(0,-1)||'0';const n=Number(digits+key);return Number.isSafeInteger(n)&&n<=cashLimit?String(n):prev})}
   const addCash=(n:number)=>setCash(prev=>String(Math.min(cashLimit,Math.max(0,Number(prev)||0)+n)))
   const [saving,setSaving]=useState(false)
   const [receipt,setReceipt]=useState<Sale|null>(null)
@@ -103,7 +103,7 @@ function App() {
           </article>)}</div></section>
           <section className={"panel checkout-summary" + (cashOpen ? " expanded" : "")}><button className="mobile-summary-toggle" onClick={() => setCashOpen(v => !v)} aria-expanded={cashOpen}><span>合計 {count}点</span><strong>{yen(total)}</strong><span>{cashOpen ? "閉じる" : "会計へ"}</span></button><div className="summary-details"><h2>会計内容</h2><div className="cart-lines">{count === 0 ? <p className="muted">商品を選択してください</p> : products.map(p => amount(p) > 0 && <div className="line" key={itemKey(p)}><span>{p.name} × {amount(p)}</span><strong>{yen(p.price * amount(p))}</strong></div>)}</div>
             <div className="line total"><span>合計金額 · {count}点</span><strong>{yen(total)}</strong></div>
-            <label htmlFor="cash">お預かり金額</label><NumberInput disabled={saving} id="cash" min="0" max={cashLimit} step="1" inputMode="numeric" value={cash} onValueChange={value => {if(value===""||(/^\\d+$/.test(value)&&Number(value)<=cashLimit))setCash(value)}} placeholder="金額を入力" />
+            <label htmlFor="cash">お預かり金額</label><NumberInput disabled={saving} id="cash" min="0" max={cashLimit} step="1" inputMode="numeric" value={cash} onValueChange={value => {if(value===""||(/^\d+$/.test(value)&&Number(value)<=cashLimit))setCash(value)}} placeholder="金額を入力" />
             <div className="cash-buttons">{presets.map((n,i)=><button disabled={saving} key={i} onClick={()=>addCash(n)}>+{n.toLocaleString()}</button>)}<button disabled={saving||total>cashLimit} onClick={()=>setCash(String(total))}>ぴったり</button></div>
             <div className="cash-keypad" aria-label="お預かり金額テンキー">{['7','8','9','4','5','6','1','2','3','C','0','⌫'].map(k=><button type="button" key={k} disabled={saving} aria-label={k==='C'?'金額クリア':k==='⌫'?'1桁削除':k} onClick={()=>enterCash(k)}>{k}</button>)}</div>
             <div className={'line change' + (cash !== '' && change < 0 ? ' shortage' : '')}><span>{cash !== '' && change < 0 ? '不足金額' : 'お釣り'}</span><strong>{cash === '' ? '—' : yen(Math.abs(change))}</strong></div>
