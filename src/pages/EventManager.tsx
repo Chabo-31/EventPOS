@@ -1,3 +1,4 @@
+import NumberInput from '../components/NumberInput'
 import { useState } from 'react'
 import { emptyEvent, saveEvent, selectEvent, copyEvent } from '../services/events'
 import type { EventData, EventDraft } from '../services/events'
@@ -42,7 +43,7 @@ export default function EventManager({data}:{data:EventData}){
     {mode==='copy'&&<p>コピー元：{origin?.name}</p>}
     <label htmlFor="event-name">イベント名</label><input id="event-name" required maxLength={100} value={draft.name} onChange={e=>setDraft(d=>({...d,name:e.target.value}))}/>
     <label htmlFor="event-date">開催日</label><input id="event-date" type="date" required value={draft.date} onChange={e=>setDraft(d=>({...d,date:e.target.value}))}/>
-    {mode==='copy'?<>{stockChoice}<label className="event-check"><input type="checkbox" checked={cash} onChange={e=>setCash(e.target.checked)}/>釣銭準備金を引き継ぐ</label><p className="muted">会計履歴・在庫増減履歴はコピーしません。</p></>:<><label htmlFor="opening-cash">釣銭準備金（円）</label><input id="opening-cash" type="number" min="0" max="99999999" step="1" required value={draft.openingCash} onChange={e=>setDraft(d=>({...d,openingCash:e.target.value}))}/></>}
+    {mode==='copy'?<>{stockChoice}<label className="event-check"><input type="checkbox" checked={cash} onChange={e=>setCash(e.target.checked)}/>釣銭準備金を引き継ぐ</label><p className="muted">会計履歴・在庫増減履歴はコピーしません。</p></>:<><label htmlFor="opening-cash">釣銭準備金（円）</label><NumberInput id="opening-cash" min="0" max="99999999" step="1" required value={draft.openingCash} onValueChange={value =>setDraft(d=>({...d,openingCash:value}))}/></>}
     <div className="actions"><button type="button" onClick={()=>setMode('list')}>取消</button><button className="primary" type="submit">保存・商品管理</button></div>
   </fieldset></form>}
   {mode==='items'&&selected&&<><h3>{selected.name} · {selected.date}</h3><button onClick={()=>{setSource(data.events.find(e=>e.id!==id)?.id??'');setStock('zero');setMode('import');setMessage('')}}>以前のイベントから商品をコピー</button><ProductManager key={id} eventId={selected.id}/></>}
