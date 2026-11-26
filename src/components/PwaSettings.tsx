@@ -16,7 +16,7 @@ export default function PwaSettings(){
  return <section className="pwa-settings">
   <h3>アプリ・オフライン</h3>
   <div className="line"><span>通信状態</span><strong>{state.online?'オンライン':'オフライン'}</strong></div>
-  <div className="line"><span>オフライン準備</span><strong>{state.ready?'完了':state.development?'開発モード':state.error?'準備失敗':'準備中・未対応'}</strong></div>
+  <div className="line"><span>オフライン準備</span><strong>{state.ready?'完了（'+state.cacheCount+'/'+state.cacheTotal+'）':state.development?'開発モード':state.error?'準備失敗':state.cacheTotal?'不足（'+state.cacheCount+'/'+state.cacheTotal+'）':'準備中・未対応'}</strong></div>
   <div className="line"><span>起動形式</span><strong>{state.installed?'アプリ':'ブラウザ'}</strong></div>
   <div className="line"><span>アプリバージョン</span><span>{formatVersion(state.version)}</span></div>
   {state.installable&&<button className="primary" onClick={()=>void installApp().catch(e=>setMessage(String(e)))}>アプリをインストール</button>}
