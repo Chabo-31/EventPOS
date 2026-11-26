@@ -35,7 +35,7 @@ export default function BackupManager({data,onRestore}:{data:EventData|null;onRe
     </article>)}
     {plan.conflicts.map(s=><p className="sale-error" key={s}>{s}</p>)}
     <p className="muted">ファイルにないイベントと既存の端末設定は維持します。未登録の設定・旧商品は追加します（設定 {plan.settings}件、旧商品 {plan.legacy}件）。競合がある場合は全件のインポートを停止します。</p>
-    <div className="actions"><button disabled={busy} onClick={()=>{setPreview(null);setPlan(null)}}>取消</button><button className="primary" disabled={busy||plan.conflicts.length>0||plan.rows.some(r=>r.status==='conflict')} onClick={()=>{if(plan.rows.some(r=>r.status==='update')&&!window.confirm('表示された差分で既存イベントを上書きしますか？'))return;void run(async()=>{const count=await restoreBackup(preview,plan);onRestore();setPreview(null);setPlan(null);setMessage('インポート完了：更新・新規登録 '+count+'イベント')})}}>インポート確定</button></div>
+    <div className="actions"><button disabled={busy} onClick={()=>{setPreview(null);setPlan(null)}}>キャンセル</button><button className="primary" disabled={busy||plan.conflicts.length>0||plan.rows.some(r=>r.status==='conflict')} onClick={()=>{if(plan.rows.some(r=>r.status==='update')&&!window.confirm('表示された差分で既存イベントを上書きしますか？'))return;void run(async()=>{const count=await restoreBackup(preview,plan);onRestore();setPreview(null);setPlan(null);setMessage('インポート完了：更新・新規登録 '+count+'イベント')})}}>インポート確定</button></div>
    </>}
 
   </div>}
