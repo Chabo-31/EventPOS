@@ -5,6 +5,8 @@ import { completeSale } from './services/checkout'
 import type { Sale, SaleLine } from './models/records'
 import EventManager from './pages/EventManager'
 import BackupManager from './pages/BackupManager'
+import PwaSettings from './components/PwaSettings'
+import { pwa, subscribePwa } from './services/pwa'
 import InventoryManager from './pages/InventoryManager'
 import { loadEvents, eventItems, canAdd, itemKey } from './services/events'
 import type { EventData, EventItem } from './services/events'
@@ -34,6 +36,8 @@ function ItemPhoto({ blob }: { blob?: Blob }) {
   return url ? <img src={url} alt="" /> : <span>写真なし</span>
 }
 function App() {
+  const [pwaState,setPwaState]=useState({...pwa})
+  useEffect(()=>{const sync=()=>setPwaState({...pwa});const unsubscribe=subscribePwa(sync);sync();return unsubscribe},[])
   const [data, setData] = useState<EventData | null>(null)
   const [loadError, setLoadError] = useState('')
   useEffect(() => {
@@ -94,8 +98,8 @@ function App() {
 
   return (
     <div className="app-shell">
-      <header className="app-header"><div><h1>EventPOS</h1><p>{active ? active.name + ' · ' + active.date : 'イベント未選択'}</p></div><span className="preview-label">現金決済</span></header>
-      <main className="workspace">{loadError && <p role="alert">読み込み失敗：{loadError}</p>}{!data && !loadError && <p>読み込み中…</p>}
+      <header className="app-header"><div><h1>EventPOS</h1><p>{active ? active.name + ' · ' + active.date : 'イベント未選択'}</p></div><div className="header-status"><span className="preview-label">現金決済</span>{!pwaState.online&&<span className="offline-label">オフライン</span>}</div></header>
+      <main className="workspace">{pwaState.update&&<div className="inventory-notice pwa-update" role="status">新しいバージョンがあります。会計終了後に設定タブから更新してください。</div>}{loadError && <p role="alert">読み込み失敗：{loadError}</p>}{!data && !loadError && <p>読み込み中…</p>}
         {tab === '会計' && <>{receipt && receipt.eventId===active?.id && <div className="sale-receipt" role="status"><div><strong>会計完了</strong><span>売上 {yen(receipt.total)} ／ お釣り {yen(receipt.change)}</span></div><button onClick={()=>setReceipt(null)}>閉じる</button></div>}{saleError && <p className="sale-error" role="alert">{saleError}</p>}<div className="checkout">
           <section className="catalog"><h2>商品選択</h2>{!active && <p className="muted">イベントタブで販売対象を登録・選択してください。</p>}{active && !products.length && <p className="muted">イベントタブで商品を登録してください。</p>}<div className="product-grid">{products.map(p => <article key={itemKey(p)} className={'product-card' + (amount(p) ? ' selected' : '')}>
             <button className="product-image"  onClick={() => adjust(p, 1)} disabled={saving || !canAdd(products, qty, p)} aria-label={p.name + 'を追加'}><ItemPhoto blob={p.image} /></button>
@@ -113,7 +117,7 @@ function App() {
         </div></>}
         {tab === '在庫' && data && <InventoryManager key={active?.id??''} eventId={active?.id??''} items={products} onMutation={()=>{reset();setReceipt(null);setSaleError('')}} />}
         {tab === 'イベント' && data && <EventManager data={data} />}
-        {tab === '設定' && <section className="panel"><h2>設定</h2><CashPresetSettings values={presets}/><BackupManager data={data} onRestore={()=>{reset();setReceipt(null);setSaleError('')}} /><h3>データベース診断</h3><button onClick={() => void runDiagnostics()} disabled={dbBusy}>{dbBusy ? "診断中…" : "保存・復元テスト"}</button><div role="status" aria-live="polite">{dbReport.map((line, i) => <p key={i}>{line}</p>)}</div></section>}
+        {tab === '設定' && <section className="panel"><h2>設定</h2><CashPresetSettings values={presets}/><BackupManager data={data} onRestore={()=>{reset();setReceipt(null);setSaleError('')}} /><PwaSettings/><h3>データベース診断</h3><button onClick={() => void runDiagnostics()} disabled={dbBusy}>{dbBusy ? "診断中…" : "保存・復元テスト"}</button><div role="status" aria-live="polite">{dbReport.map((line, i) => <p key={i}>{line}</p>)}</div></section>}
       </main>
       <nav className="navigation" aria-label="メインメニュー">{tabs.map(t => <button key={t} aria-current={tab === t ? 'page' : undefined} className={tab === t ? 'active' : ''} disabled={saving} onClick={() => { if (t === 'イベント') { reset();setReceipt(null);setSaleError('') }; setTab(t) }}><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={navPaths[t]} /></svg><span>{t}</span></button>)}</nav>
     </div>
