@@ -154,3 +154,5 @@ h2 { margin-bottom: 10px; }
 .event-toolbar { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:6px; }
 .event-toolbar button { white-space:nowrap; }
 @media(max-width:420px){.event-toolbar {gap:4px;} .event-toolbar button {padding:6px 8px;font-size:12px;}}
+
+.actions.merge-actions { grid-template-columns:repeat(2,minmax(0,1fr)); }
