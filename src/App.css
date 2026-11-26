@@ -150,3 +150,7 @@ h2 { margin-bottom: 10px; }
 .backup-preview { border:1px solid var(--border); border-radius:10px; padding:12px; margin:12px 0; background:#f3f5f8; }
 .backup-preview h3 { margin-top:0; }
 .backup-preview .muted { margin:10px 0; }
+
+.event-toolbar { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:6px; }
+.event-toolbar button { white-space:nowrap; }
+@media(max-width:420px){.event-toolbar {gap:4px;} .event-toolbar button {padding:6px 8px;font-size:12px;}}
