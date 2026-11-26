@@ -5,7 +5,7 @@ export default function PwaSettings(){
  const [state,setState]=useState({...pwa})
  const [message,setMessage]=useState('')
  const [busy,setBusy]=useState(false)
- useEffect(()=>subscribePwa(()=>setState({...pwa})),[])
+ useEffect(()=>{const sync=()=>setState({...pwa});const unsubscribe=subscribePwa(sync);sync();return unsubscribe},[])
  const update=async()=>{setBusy(true);setMessage('');try{await checkUpdate();setMessage(pwa.update?'新しいバージョンがあります':'更新確認が完了しました')}catch(e){setMessage(String(e))}finally{setBusy(false)}}
  return <section className="pwa-settings">
   <h3>アプリ・オフライン</h3>
