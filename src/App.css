@@ -111,3 +111,22 @@ h2 { margin-bottom: 10px; }
 .sale-receipt { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:12px; margin-bottom:12px; border:1px solid #a9c8b5; border-radius:10px; background:#eef6f0; color:#24583a; }
 .sale-receipt div { display:grid; gap:4px; }
 .sale-error { padding:12px; border:1px solid #e8b6b2; border-radius:8px; color:#b42318; background:#fff5f4; }
+
+/* Phase 6: inventory and sales */
+.inventory-tabs { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:6px; margin-bottom:14px; }
+.inventory-tabs button { font-size:14px; padding:6px 4px; }
+.inventory-entry { padding-bottom:10px; margin-bottom:8px; border-bottom:1px solid var(--border); }
+.inventory-entry .inventory-row { border-bottom:0; }
+.inventory-add,.cancel-confirm { padding:12px; border:1px solid var(--border); border-radius:10px; margin:10px 0; background:#f3f5f8; }
+.inventory-add .actions,.cancel-confirm .actions { margin-top:12px; }
+.sales-metrics { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin-bottom:12px; }
+.sales-metrics div { display:grid; gap:6px; padding:14px; border:1px solid var(--border); border-radius:10px; }
+.sales-metrics span { color:var(--muted); font-size:13px; }
+.sales-metrics strong { font-size:clamp(17px,3vw,26px); overflow-wrap:anywhere; }
+.history-card { padding:12px; margin:8px 0; border:1px solid var(--border); border-radius:10px; }
+.history-card .line { margin:5px 0; }
+.history-card p { margin:8px 0; }
+.history-card.cancelled { background:#f3f5f8; }
+.inventory-notice { color:#24583a; background:#eef6f0; padding:10px; border-radius:8px; }
+.danger { background:#a52620; border-color:#a52620; color:#fff; }
+@media(max-width:420px){.inventory-tabs {grid-template-columns:repeat(2,minmax(0,1fr));}.inventory-row {gap:8px;}.inventory-row button {padding:6px 8px;}}
