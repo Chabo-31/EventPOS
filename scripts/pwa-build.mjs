@@ -34,7 +34,7 @@ self.addEventListener('fetch',event=>{
  if(request.mode==='navigate'){
   event.respondWith((async()=>{const cache=await caches.open(CACHE);return (await cache.match(new URL('index.html',scope).href))||fetch(request);})());return;
  }
- if(!absolute.includes(request.url))return;
+ if(!absolute.includes(request.url)){if(new URL(request.url).pathname.startsWith(new URL('assets/',scope).pathname))event.respondWith((async()=> (await caches.match(request))||fetch(request))());return;}
  event.respondWith((async()=>{const cache=await caches.open(CACHE);return (await cache.match(request))||fetch(request);})());
 });
 `;
