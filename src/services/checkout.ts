@@ -1,5 +1,5 @@
 import { db } from '../database/db'
-import type { Sale, SaleLine } from '../models/records'
+import type { Product, Bundle, Sale, SaleLine } from '../models/records'
 
 export async function completeSale(eventId:string, requestId:string, lines:SaleLine[], cash:number, expectedTotal:number):Promise<Sale>{
   if(!lines.length || !Number.isSafeInteger(cash) || cash<0) throw new Error('会計内容を確認してください')
@@ -18,10 +18,21 @@ export async function completeSale(eventId:string, requestId:string, lines:SaleL
       const key=line.kind+':'+line.itemId
       if(keys.has(key)||!Number.isSafeInteger(line.quantity)||line.quantity<1)throw new Error('販売数量が不正です')
       keys.add(key)
-      const item=line.kind==='product'?await db.products.get(line.itemId):await db.bundles.get(line.itemId)
+      let item:Product
+      let components:SaleLine['components']
+      if(line.kind==='product'){
+        const product=await db.products.get(line.itemId)
+        if(!product||product.eventId!==eventId)throw new Error('商品情報が変更されました')
+        item=product
+        components=[{productId:product.id,quantity:1}]
+      }else{
+        const bundle:Bundle|undefined=await db.bundles.get(line.itemId)
+        if(!bundle||bundle.eventId!==eventId)throw new Error('商品情報が変更されました')
+        item=bundle
+        components=bundle.components
+      }
       const link=line.kind==='product'?await db.eventProducts.get([eventId,line.itemId]):await db.eventBundles.get([eventId,line.itemId])
-      if(!item||item.eventId!==eventId||!link)throw new Error('商品情報が変更されました')
-      const components='components' in item?item.components:[{productId:item.id,quantity:1}]
+      if(!link)throw new Error('商品情報が変更されました')
       if(item.name!==line.name||link.price!==line.unitPrice||JSON.stringify(components)!==JSON.stringify(line.components))throw new Error('商品情報が変更されました。会計を確認してください')
       if(!Number.isSafeInteger(link.price)||link.price<0||!components.length)throw new Error('商品設定が不正です')
       for(const c of components){

@@ -1,3 +1,4 @@
+import Dexie from 'dexie'
 import { db } from '../database/db'
 import type { EventRecord, Product, Bundle, EventProduct, EventBundle, InventoryMovement, Sale, Setting, ProductImage } from '../models/records'
 
@@ -76,41 +77,95 @@ export function validateBackup(input:unknown):Backup{
  return b
 }
 export async function readBackup(file:File){if(file.size>100*1024*1024)throw new Error('ファイルは100MB以下にしてください');return validateBackup(JSON.parse(await file.text()))}
-export async function restoreBackup(input:Backup,mode:'overwrite'|'copy'){
- const b=validateBackup(input)
- const images=b.images.map(decode)
- await db.transaction('rw',tables(),async()=>{
-  if(mode==='copy'){
-   // New IDs for every record, including transaction references and photos.
-   const em=new Map(b.events.map(e=>[e.id,crypto.randomUUID()])),pm=new Map(b.products.map(p=>[p.id,crypto.randomUUID()])),bm=new Map(b.bundles.map(p=>[p.id,crypto.randomUUID()])),im=new Map(images.map(i=>[i.id,crypto.randomUUID()])),sm=new Map(b.sales.map(s=>[s.id,crypto.randomUUID()]))
-   const comp=(c:Bundle['components'])=>c.map(x=>({...x,productId:pm.get(x.productId)!}))
-   await db.events.bulkAdd(b.events.map(e=>({...e,id:em.get(e.id)!,name:e.name.slice(0,94)+'（復元）'})))
-   await db.images.bulkAdd(images.map(i=>({...i,id:im.get(i.id)!})))
-   await db.products.bulkAdd(b.products.map(p=>({...p,id:pm.get(p.id)!,eventId:p.eventId?em.get(p.eventId):undefined,imageId:p.imageId?im.get(p.imageId):undefined})))
-   await db.bundles.bulkAdd(b.bundles.map(p=>({...p,id:bm.get(p.id)!,eventId:p.eventId?em.get(p.eventId):undefined,imageId:p.imageId?im.get(p.imageId):undefined,components:comp(p.components)})))
-   await db.eventProducts.bulkAdd(b.eventProducts.map(p=>({...p,eventId:em.get(p.eventId)!,productId:pm.get(p.productId)!})))
-   await db.eventBundles.bulkAdd(b.eventBundles.map(p=>({...p,eventId:em.get(p.eventId)!,bundleId:bm.get(p.bundleId)!})))
-   await db.sales.bulkAdd(b.sales.map(s=>({...s,id:sm.get(s.id)!,eventId:em.get(s.eventId)!,lines:s.lines.map(l=>({...l,itemId:(l.kind==='product'?pm:bm).get(l.itemId)!,components:comp(l.components)}))})))
-   await db.movements.bulkAdd(b.movements.map(m=>({...m,id:crypto.randomUUID(),eventId:em.get(m.eventId)!,productId:pm.get(m.productId)!,transactionId:m.transactionId?sm.get(m.transactionId):undefined})))
-   if(b.events.length&&!(await db.settings.get('activeEvent'))?.value)await db.settings.put({key:'activeEvent',value:em.get(b.events[0].id)!})
-   return
+
+type Change={label:string;added:number;changed:number;removed:number}
+export type RestoreRow={id:string;name:string;status:'new'|'same'|'update'|'conflict';changes:Change[];reasons:string[]}
+export type RestorePlan={rows:RestoreRow[];conflicts:string[];settings:number;legacy:number;fingerprint:string}
+function canonical(x:unknown):string{
+ if(Array.isArray(x))return '['+x.map(canonical).join(',')+']'
+ if(x&&typeof x==='object'){const r=x as Record<string,unknown>;return '{'+Object.keys(r).filter(k=>r[k]!==undefined).sort().map(k=>JSON.stringify(k)+':'+canonical(r[k])).join(',')+'}'}
+ return JSON.stringify(x)??'null'
+}
+const equal=(a:unknown,b:unknown)=>canonical(a)===canonical(b)
+function diff<T>(label:string,local:T[],incoming:T[],key:(r:T)=>string):Change{
+ const a=new Map(local.map(r=>[key(r),r])),b=new Map(incoming.map(r=>[key(r),r]))
+ return {label,added:incoming.filter(r=>!a.has(key(r))).length,changed:incoming.filter(r=>a.has(key(r))&&!equal(a.get(key(r)),r)).length,removed:local.filter(r=>!b.has(key(r))).length}
+}
+function subset(b:Backup,eventId:string){
+ const products=b.products.filter(p=>p.eventId===eventId),bundles=b.bundles.filter(p=>p.eventId===eventId)
+ const photoIds=new Set([...products,...bundles].map(p=>p.imageId))
+ return {events:b.events.filter(e=>e.id===eventId),products,bundles,images:b.images.filter(i=>photoIds.has(i.id)),eventProducts:b.eventProducts.filter(p=>p.eventId===eventId),eventBundles:b.eventBundles.filter(p=>p.eventId===eventId),sales:b.sales.filter(s=>s.eventId===eventId),movements:b.movements.filter(m=>m.eventId===eventId)}
+}
+function planRestore(local:Backup,b:Backup):RestorePlan{
+ const conflicts:string[]=[]
+ const rows:RestoreRow[]=b.events.map(e=>{
+  const a=subset(local,e.id),n=subset(b,e.id),reasons:string[]=[]
+  const changes=[diff('イベント情報',a.events,n.events,r=>r.id),diff('単品商品',a.products,n.products,r=>r.id),diff('セット商品',a.bundles,n.bundles,r=>r.id),diff('写真',a.images,n.images,r=>r.id),diff('在庫・価格',a.eventProducts,n.eventProducts,r=>r.productId),diff('セット価格',a.eventBundles,n.eventBundles,r=>r.bundleId),diff('会計履歴',a.sales,n.sales,r=>r.id),diff('在庫履歴',a.movements,n.movements,r=>r.id)].filter(x=>x.added||x.changed||x.removed)
+  for(const s of a.sales){
+   const incoming=n.sales.find(r=>r.id===s.id)
+   if(!incoming){reasons.push('端末側にのみ存在する会計履歴があります');continue}
+   const {cancelledAt:oldCancel,...old}=s
+   const {cancelledAt:newCancel,...next}=incoming
+   if(!equal(old,next)||(oldCancel!==undefined&&oldCancel!==newCancel))reasons.push('会計内容または取消履歴が競合しています')
   }
-  if(b.scope==='all'){
-   // Full restore deliberately replaces the entire local snapshot.
-   for(const t of tables())await t.clear()
-  }else{
-   const eventId=b.events[0].id
-   const old=[...await db.products.where('eventId').equals(eventId).toArray(),...await db.bundles.where('eventId').equals(eventId).toArray()]
+  for(const m of a.movements.filter(r=>r.reason!=='initial')){
+   if(!equal(m,n.movements.find(r=>r.id===m.id)))reasons.push('端末側の在庫増減履歴が欠落または変更されています')
+  }
+  // Initial stock can be edited before sales; once operational history exists, protect it too.
+  if(a.sales.length||a.movements.some(m=>m.reason!=='initial')){
+   if(a.movements.filter(m=>m.reason==='initial').some(m=>!equal(m,n.movements.find(r=>r.id===m.id))))reasons.push('販売開始後の初期在庫履歴が競合しています')
+  }
+  const status=reasons.length?'conflict':!a.events.length?'new':changes.length?'update':'same'
+  return {id:e.id,name:e.name,status,changes,reasons:[...new Set(reasons)]}
+ })
+ // ID collisions across unrelated events or legacy records are never overwritten.
+ for(const [label,old,next] of [['商品',local.products,b.products],['セット',local.bundles,b.bundles]] as const){
+  for(const p of next){const prev=old.find(r=>r.id===p.id);if(prev&&(prev.eventId!==p.eventId||(!p.eventId&&!equal(prev,p))))conflicts.push(label+'IDの競合：'+p.name)}
+ }
+ for(const [label,old,next] of [['会計',local.sales,b.sales],['在庫履歴',local.movements,b.movements]] as const){
+  for(const r of next){const prev=old.find(x=>x.id===r.id);if(prev&&prev.eventId!==r.eventId)conflicts.push(label+'IDの競合')}
+ }
+ const affected=new Set(rows.filter(r=>r.status==='update'||r.status==='new').map(r=>r.id))
+ for(const i of b.images){const old=local.images.find(r=>r.id===i.id);if(old&&!equal(old,i)&&[...local.products,...local.bundles].some(p=>p.imageId===i.id&&(!p.eventId||!affected.has(p.eventId))))conflicts.push('他のイベント・旧商品が使用する写真IDの競合')}
+ const legacy=[...b.products.filter(p=>!p.eventId&&!local.products.some(x=>x.id===p.id)),...b.bundles.filter(p=>!p.eventId&&!local.bundles.some(x=>x.id===p.id))].length
+ const settings=b.settings.filter(s=>s.key!=='activeEvent'&&!local.settings.some(x=>x.key===s.key)).length
+ // Include entire current snapshot except creation time; detect any change between preview and commit.
+ const {createdAt,...snapshot}=local
+ void createdAt
+ return {rows,conflicts:[...new Set(conflicts)],settings,legacy,fingerprint:canonical(snapshot)}
+}
+export async function inspectRestore(input:Backup):Promise<RestorePlan>{
+ return planRestore(await exportBackup(),validateBackup(input))
+}
+export async function restoreBackup(input:Backup,approved:RestorePlan){
+ const b=validateBackup(input),images=b.images.map(decode)
+ return db.transaction('rw',tables(),async()=>{
+  // Blob encoding is not an IndexedDB request; keep the transaction alive while comparing bytes.
+  const local=await Dexie.waitFor(exportBackup())
+  const plan=planRestore(local,b)
+  if(plan.fingerprint!==approved.fingerprint)throw new Error('確認後に端末データが変更されました。ファイルを選び直してください')
+  if(plan.conflicts.length||plan.rows.some(r=>r.status==='conflict'))throw new Error('競合があるためインポートできません')
+  const affected=new Set(plan.rows.filter(r=>r.status==='new'||r.status==='update').map(r=>r.id))
+  const oldPhotos=new Set<string>()
+  for(const eventId of affected){
+   for(const p of [...await db.products.where('eventId').equals(eventId).toArray(),...await db.bundles.where('eventId').equals(eventId).toArray()])if(p.imageId)oldPhotos.add(p.imageId)
    await db.products.where('eventId').equals(eventId).delete();await db.bundles.where('eventId').equals(eventId).delete()
    await db.eventProducts.where('eventId').equals(eventId).delete();await db.eventBundles.where('eventId').equals(eventId).delete()
    await db.sales.where('eventId').equals(eventId).delete();await db.movements.where('eventId').equals(eventId).delete();await db.events.delete(eventId)
-   const remaining=new Set([...await db.products.toArray(),...await db.bundles.toArray()].map(p=>p.imageId))
-   for(const p of old)if(p.imageId&&!remaining.has(p.imageId))await db.images.delete(p.imageId)
   }
-  // add, rather than put, prevents accidental overwrite of unrelated records on ID collision.
-  await db.events.bulkAdd(b.events);await db.products.bulkAdd(b.products);await db.bundles.bulkAdd(b.bundles);await db.images.bulkAdd(images)
-  await db.eventProducts.bulkAdd(b.eventProducts);await db.eventBundles.bulkAdd(b.eventBundles);await db.sales.bulkAdd(b.sales);await db.movements.bulkAdd(b.movements)
-  if(b.scope==='all')await db.settings.bulkAdd(b.settings)
-  if(b.events.length&&!(await db.settings.get('activeEvent'))?.value)await db.settings.put({key:'activeEvent',value:b.events[0].id})
+  const products=b.products.filter(p=>p.eventId?affected.has(p.eventId):!local.products.some(x=>x.id===p.id))
+  const bundles=b.bundles.filter(p=>p.eventId?affected.has(p.eventId):!local.bundles.some(x=>x.id===p.id))
+  const photoIds=new Set([...products,...bundles].map(p=>p.imageId))
+  for(const i of images.filter(i=>photoIds.has(i.id)))await db.images.put(i)
+  await db.events.bulkAdd(b.events.filter(e=>affected.has(e.id)))
+  await db.products.bulkAdd(products);await db.bundles.bulkAdd(bundles)
+  await db.eventProducts.bulkAdd(b.eventProducts.filter(p=>affected.has(p.eventId)));await db.eventBundles.bulkAdd(b.eventBundles.filter(p=>affected.has(p.eventId)))
+  await db.sales.bulkAdd(b.sales.filter(s=>affected.has(s.eventId)));await db.movements.bulkAdd(b.movements.filter(m=>affected.has(m.eventId)))
+  const remaining=new Set([...await db.products.toArray(),...await db.bundles.toArray()].map(p=>p.imageId))
+  for(const i of oldPhotos)if(!remaining.has(i))await db.images.delete(i)
+  // Existing device settings and events not in the file are preserved.
+  for(const s of b.settings)if(s.key!=='activeEvent'&&!await db.settings.get(s.key))await db.settings.add(s)
+  if(b.events.length&&!(await db.settings.get('activeEvent'))?.value)await db.settings.put({key:'activeEvent',value:b.settings.find(s=>s.key==='activeEvent'&&b.events.some(e=>e.id===s.value))?.value??b.events[0].id})
+  return affected.size
  })
 }
