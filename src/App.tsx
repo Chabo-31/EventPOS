@@ -9,6 +9,8 @@ import { loadEvents, eventItems, canAdd, itemKey } from './services/events'
 import type { EventData, EventItem } from './services/events'
 import './App.css'
 import { checkDatabase } from './database/diagnostics'
+import { db } from './database/db'
+import CashPresetSettings, { defaultPresets, readPresets } from './components/CashPresetSettings'
 
 const tabs = ['会計', '在庫', 'イベント', '設定'] as const
 type Tab = typeof tabs[number]
@@ -53,6 +55,11 @@ function App() {
   const qty = cart.eventId === active?.id ? cart.qty : {}
   const [cashOpen, setCashOpen] = useState(false)
   const [cash, setCash] = useState('0')
+  const [presets,setPresets]=useState<number[]>(defaultPresets)
+  useEffect(()=>{const sub=liveQuery(async()=>readPresets((await db.settings.get('cashPresets'))?.value)).subscribe({next:setPresets,error:e=>setLoadError(String(e))});return ()=>sub.unsubscribe()},[])
+  const cashLimit=999999999
+  const enterCash=(key:string)=>{if(gate.current)return;setCash(prev=>{const digits=/^\\d+$/.test(prev)?prev:'0';if(key==='C')return '0';if(key==='⌫')return digits.slice(0,-1)||'0';const n=Number(digits+key);return Number.isSafeInteger(n)&&n<=cashLimit?String(n):prev})}
+  const addCash=(n:number)=>setCash(prev=>String(Math.min(cashLimit,Math.max(0,Number(prev)||0)+n)))
   const [saving,setSaving]=useState(false)
   const [receipt,setReceipt]=useState<Sale|null>(null)
   const [saleError,setSaleError]=useState('')
@@ -61,7 +68,7 @@ function App() {
   const total = products.reduce((sum, p) => sum + p.price * amount(p), 0)
   const count = products.reduce((sum, p) => sum + amount(p), 0)
   const change = Number(cash) - total
-  const valid = !!active && !saving && count > 0 && Number.isSafeInteger(total) && cash !== '' && Number.isSafeInteger(Number(cash)) && Number(cash) >= 0 && change >= 0
+  const valid = !!active && !saving && count > 0 && Number.isSafeInteger(total) && cash !== '' && Number.isSafeInteger(Number(cash)) && Number(cash) >= 0 && Number(cash)<=cashLimit && change >= 0
   const adjust = (p: EventItem, delta: number) => {
     if (!active || gate.current) return
     setReceipt(null); setSaleError('')
@@ -96,15 +103,16 @@ function App() {
           </article>)}</div></section>
           <section className={"panel checkout-summary" + (cashOpen ? " expanded" : "")}><button className="mobile-summary-toggle" onClick={() => setCashOpen(v => !v)} aria-expanded={cashOpen}><span>合計 {count}点</span><strong>{yen(total)}</strong><span>{cashOpen ? "閉じる" : "会計へ"}</span></button><div className="summary-details"><h2>会計内容</h2><div className="cart-lines">{count === 0 ? <p className="muted">商品を選択してください</p> : products.map(p => amount(p) > 0 && <div className="line" key={itemKey(p)}><span>{p.name} × {amount(p)}</span><strong>{yen(p.price * amount(p))}</strong></div>)}</div>
             <div className="line total"><span>合計金額 · {count}点</span><strong>{yen(total)}</strong></div>
-            <label htmlFor="cash">お預かり金額</label><NumberInput disabled={saving} id="cash" min="0" step="1" inputMode="numeric" value={cash} onValueChange={value => setCash(value)} placeholder="金額を入力" />
-            <div className="cash-buttons">{[1000, 5000, 10000].map(n => <button disabled={saving} key={n} onClick={() => setCash(String((Number(cash) || 0) + n))}>+{n.toLocaleString()}</button>)}<button disabled={saving} onClick={() => setCash(String(total))}>丁度</button></div>
+            <label htmlFor="cash">お預かり金額</label><NumberInput disabled={saving} id="cash" min="0" max={cashLimit} step="1" inputMode="numeric" value={cash} onValueChange={value => {if(value===""||(/^\\d+$/.test(value)&&Number(value)<=cashLimit))setCash(value)}} placeholder="金額を入力" />
+            <div className="cash-buttons">{presets.map((n,i)=><button disabled={saving} key={i} onClick={()=>addCash(n)}>+{n.toLocaleString()}</button>)}<button disabled={saving||total>cashLimit} onClick={()=>setCash(String(total))}>丁度</button></div>
+            <div className="cash-keypad" aria-label="お預かり金額テンキー">{['7','8','9','4','5','6','1','2','3','C','0','⌫'].map(k=><button type="button" key={k} disabled={saving} aria-label={k==='C'?'金額クリア':k==='⌫'?'1桁削除':k} onClick={()=>enterCash(k)}>{k}</button>)}</div>
             <div className={'line change' + (cash !== '' && change < 0 ? ' shortage' : '')}><span>{cash !== '' && change < 0 ? '不足金額' : 'お釣り'}</span><strong>{cash === '' ? '—' : yen(Math.abs(change))}</strong></div>
             <div className="actions"><button disabled={saving} onClick={()=>{reset();setReceipt(null);setSaleError('')}}>リセット</button><button className="primary" disabled={!valid} onClick={() => void confirmSale()}>{saving ? '保存中…' : '会計確定'}</button></div></div>
           </section>
         </div></>}
-        {tab === '在庫' && (active ? <InventoryManager key={active.id} eventId={active.id} items={products} onMutation={()=>{reset();setReceipt(null);setSaleError('')}} /> : <section className="panel"><h2>在庫・売上管理</h2><p className="muted">イベントを選択してください。</p></section>)}
+        {tab === '在庫' && data && <InventoryManager key={active?.id??''} eventId={active?.id??''} items={products} onMutation={()=>{reset();setReceipt(null);setSaleError('')}} />}
         {tab === 'イベント' && data && <EventManager data={data} />}
-        {tab === '設定' && <section className="panel"><h2>設定</h2>{['バックアップ出力', 'インポート'].map(label => <div className="line setting-row" key={label}><span>{label}</span><button disabled>準備中</button></div>)}<p className="muted">各機能は後続Phaseで実装します。</p><h3>データベース診断</h3><button onClick={() => void runDiagnostics()} disabled={dbBusy}>{dbBusy ? "診断中…" : "保存・復元テスト"}</button><div role="status" aria-live="polite">{dbReport.map((line, i) => <p key={i}>{line}</p>)}</div></section>}
+        {tab === '設定' && <section className="panel"><h2>設定</h2><CashPresetSettings values={presets}/>{['バックアップ出力', 'インポート'].map(label => <div className="line setting-row" key={label}><span>{label}</span><button disabled>準備中</button></div>)}<p className="muted">各機能は後続Phaseで実装します。</p><h3>データベース診断</h3><button onClick={() => void runDiagnostics()} disabled={dbBusy}>{dbBusy ? "診断中…" : "保存・復元テスト"}</button><div role="status" aria-live="polite">{dbReport.map((line, i) => <p key={i}>{line}</p>)}</div></section>}
       </main>
       <nav className="navigation" aria-label="メインメニュー">{tabs.map(t => <button key={t} aria-current={tab === t ? 'page' : undefined} className={tab === t ? 'active' : ''} disabled={saving} onClick={() => { if (t === 'イベント') { reset();setReceipt(null);setSaleError('') }; setTab(t) }}><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={navPaths[t]} /></svg><span>{t}</span></button>)}</nav>
     </div>
