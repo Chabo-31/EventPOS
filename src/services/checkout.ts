@@ -1,5 +1,5 @@
 import { db } from '../database/db'
-import type { Sale, SaleLine } from '../models/records'
+import type { Product, Bundle, Sale, SaleLine } from '../models/records'
 
 export async function completeSale(eventId:string, requestId:string, lines:SaleLine[], cash:number, expectedTotal:number):Promise<Sale>{
   if(!lines.length || !Number.isSafeInteger(cash) || cash<0) throw new Error('会計内容を確認してください')
@@ -18,7 +18,7 @@ export async function completeSale(eventId:string, requestId:string, lines:SaleL
       const key=line.kind+':'+line.itemId
       if(keys.has(key)||!Number.isSafeInteger(line.quantity)||line.quantity<1)throw new Error('販売数量が不正です')
       keys.add(key)
-      const item=line.kind==='product'?await db.products.get(line.itemId):await db.bundles.get(line.itemId)
+      const item:Product|Bundle|undefined=line.kind==='product'?await db.products.get(line.itemId):await db.bundles.get(line.itemId)
       const link=line.kind==='product'?await db.eventProducts.get([eventId,line.itemId]):await db.eventBundles.get([eventId,line.itemId])
       if(!item||item.eventId!==eventId||!link)throw new Error('商品情報が変更されました')
       const components='components' in item?item.components:[{productId:item.id,quantity:1}]
