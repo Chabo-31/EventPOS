@@ -4,6 +4,7 @@ import { liveQuery } from 'dexie'
 import { completeSale } from './services/checkout'
 import type { Sale, SaleLine } from './models/records'
 import EventManager from './pages/EventManager'
+import InventoryManager from './pages/InventoryManager'
 import { loadEvents, eventItems, canAdd, itemKey } from './services/events'
 import type { EventData, EventItem } from './services/events'
 import './App.css'
@@ -101,7 +102,7 @@ function App() {
             <div className="actions"><button disabled={saving} onClick={()=>{reset();setReceipt(null);setSaleError('')}}>リセット</button><button className="primary" disabled={!valid} onClick={() => void confirmSale()}>{saving ? '保存中…' : '会計確定'}</button></div></div>
           </section>
         </div></>}
-        {tab === '在庫' && <section className="panel"><h2>在庫管理</h2><p className="muted">在庫追加は後続Phaseで実装します。</p>{active && <p>釣銭準備金：{yen(active.openingCash)}</p>}{products.map(p => <div className="inventory-row" key={itemKey(p)}><span>{p.name}</span><strong>{p.stock}点</strong><button disabled>在庫追加</button></div>)}</section>}
+        {tab === '在庫' && (active ? <InventoryManager key={active.id} eventId={active.id} items={products} onMutation={()=>{reset();setReceipt(null);setSaleError('')}} /> : <section className="panel"><h2>在庫・売上管理</h2><p className="muted">イベントを選択してください。</p></section>)}
         {tab === 'イベント' && data && <EventManager data={data} />}
         {tab === '設定' && <section className="panel"><h2>設定</h2>{['バックアップ出力', 'インポート'].map(label => <div className="line setting-row" key={label}><span>{label}</span><button disabled>準備中</button></div>)}<p className="muted">各機能は後続Phaseで実装します。</p><h3>データベース診断</h3><button onClick={() => void runDiagnostics()} disabled={dbBusy}>{dbBusy ? "診断中…" : "保存・復元テスト"}</button><div role="status" aria-live="polite">{dbReport.map((line, i) => <p key={i}>{line}</p>)}</div></section>}
       </main>
