@@ -15,7 +15,7 @@ const urls=paths.map(p=>'./'+p.slice(root.length+1).replaceAll('\\','/'))
 const source=`const VERSION=${JSON.stringify(version)};
 const FILES=${JSON.stringify(urls)};
 const scope=self.registration.scope;
-const PREFIX='eventpos-v2:'+scope+':';
+const PREFIX='eventpos-v3:'+scope+':';
 const CACHE=PREFIX+VERSION;
 const absolute=FILES.map(p=>new URL(p,scope).href);
 const shell=new URL('index.html',scope).href;
@@ -44,24 +44,34 @@ self.addEventListener('activate',event=>event.waitUntil((async()=>{
  // Do not delete older caches here: existing tabs can still need their hashed assets.
  await self.clients.claim();
 })()));
-self.addEventListener('message',event=>{if(event.data?.type==='ACTIVATE_UPDATE')event.waitUntil(self.skipWaiting());});
+self.addEventListener('message',event=>{
+ if(event.data?.type==='ACTIVATE_UPDATE')event.waitUntil(self.skipWaiting());
+ if(event.data?.type==='CHECK_OFFLINE'&&event.ports[0])event.waitUntil((async()=>{
+  try{
+   const cache=await caches.open(CACHE);
+   const missing=[];
+   for(const url of absolute)if(!valid(await cache.match(url,{ignoreVary:true}),url))missing.push(url);
+   event.ports[0].postMessage({ready:missing.length===0,count:absolute.length-missing.length,total:absolute.length,version:VERSION});
+  }catch{event.ports[0].postMessage({ready:false,count:0,total:absolute.length,version:VERSION});}
+ })());
+});
 async function cachedAsset(request){
  const current=await caches.open(CACHE);
- const own=await current.match(request);
+ const own=await current.match(request.url,{ignoreVary:true});
  if(valid(own,request.url))return own;
  for(const name of (await caches.keys()).filter(n=>n.startsWith(PREFIX)&&n!==CACHE).reverse()){
-  const previous=await (await caches.open(name)).match(request);
+  const previous=await (await caches.open(name)).match(request.url,{ignoreVary:true});
   if(valid(previous,request.url))return previous;
  }
- const response=await fetch(request);
- return valid(response,request.url)?response:new Response('Asset unavailable',{status:503,headers:{'Content-Type':'text/plain'}});
+ try{const response=await fetch(request);if(valid(response,request.url))return response;}catch{}
+ return new Response('Asset unavailable',{status:503,headers:{'Content-Type':'text/plain'}});
 }
 async function navigation(request){
  const cache=await caches.open(CACHE);
- const html=await cache.match(shell);
+ const html=await cache.match(shell,{ignoreVary:true});
  // Only serve the cached shell if its complete hashed asset set is still available.
  if(valid(html,shell)){
-  const checks=await Promise.all(absolute.filter(u=>u.startsWith(assetRoot)).map(async u=>valid(await cache.match(u),u)));
+  const checks=await Promise.all(absolute.filter(u=>u.startsWith(assetRoot)).map(async u=>valid(await cache.match(u,{ignoreVary:true}),u)));
   if(checks.every(Boolean))return html;
  }
  try{const response=await fetch(request,{cache:'no-store'});if(valid(response,shell))return response;}catch{}
