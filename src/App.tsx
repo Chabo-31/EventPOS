@@ -1,3 +1,4 @@
+import NumberInput from './components/NumberInput'
 import { useEffect, useState } from 'react'
 import { liveQuery } from 'dexie'
 import EventManager from './pages/EventManager'
@@ -48,7 +49,7 @@ function App() {
   const [cart, setCart] = useState<{ eventId: string; qty: Record<string, number> }>({ eventId: '', qty: {} })
   const qty = cart.eventId === active?.id ? cart.qty : {}
   const [cashOpen, setCashOpen] = useState(false)
-  const [cash, setCash] = useState('')
+  const [cash, setCash] = useState('0')
   const amount = (p: EventItem) => qty[itemKey(p)] ?? 0
   const total = products.reduce((sum, p) => sum + p.price * amount(p), 0)
   const count = products.reduce((sum, p) => sum + amount(p), 0)
@@ -62,7 +63,7 @@ function App() {
       return { eventId: active.id, qty: { ...current, [itemKey(p)]: Math.max(0, (current[itemKey(p)] ?? 0) + delta) } }
     })
   }
-  const reset = () => { setCart({ eventId: active?.id ?? '', qty: {} }); setCash(''); setCashOpen(false) }
+  const reset = () => { setCart({ eventId: active?.id ?? '', qty: {} }); setCash('0'); setCashOpen(false) }
 
   return (
     <div className="app-shell">
@@ -76,7 +77,7 @@ function App() {
           </article>)}</div></section>
           <section className={"panel checkout-summary" + (cashOpen ? " expanded" : "")}><button className="mobile-summary-toggle" onClick={() => setCashOpen(v => !v)} aria-expanded={cashOpen}><span>合計 {count}点</span><strong>{yen(total)}</strong><span>{cashOpen ? "閉じる" : "会計へ"}</span></button><div className="summary-details"><h2>会計内容</h2><div className="cart-lines">{count === 0 ? <p className="muted">商品を選択してください</p> : products.map(p => amount(p) > 0 && <div className="line" key={itemKey(p)}><span>{p.name} × {amount(p)}</span><strong>{yen(p.price * amount(p))}</strong></div>)}</div>
             <div className="line total"><span>合計金額 · {count}点</span><strong>{yen(total)}</strong></div>
-            <label htmlFor="cash">お預かり金額</label><input id="cash" type="number" min="0" step="1" inputMode="numeric" value={cash} onChange={e => setCash(e.target.value)} placeholder="金額を入力" />
+            <label htmlFor="cash">お預かり金額</label><NumberInput id="cash" min="0" step="1" inputMode="numeric" value={cash} onValueChange={value => setCash(value)} placeholder="金額を入力" />
             <div className="cash-buttons">{[1000, 5000, 10000].map(n => <button key={n} onClick={() => setCash(String((Number(cash) || 0) + n))}>+{n.toLocaleString()}</button>)}<button onClick={() => setCash(String(total))}>丁度</button></div>
             <div className={'line change' + (cash !== '' && change < 0 ? ' shortage' : '')}><span>{cash !== '' && change < 0 ? '不足金額' : 'お釣り'}</span><strong>{cash === '' ? '—' : yen(Math.abs(change))}</strong></div>
             <div className="actions"><button onClick={reset}>リセット</button><button className="primary" disabled={!valid} onClick={() => { window.alert('GUIプレビュー：会計データは保存されません。'); reset() }}>会計確定</button></div></div>
