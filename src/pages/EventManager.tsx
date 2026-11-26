@@ -30,6 +30,11 @@ export default function EventManager({data}:{data:EventData}){
     gate.current=true;setBusy(true);setMessage('')
     try{await work();setMessage(success)}catch(e){setMessage(e instanceof Error?e.message:String(e))}finally{gate.current=false;setBusy(false)}
   }
+  const changeMergeSelection=(nextSource:string,nextTarget:string)=>{
+    if(gate.current)return
+    setSource(nextSource);setTarget(nextTarget);setMerge(null);setConfirmed(false);setMessage('')
+    if(nextSource&&nextTarget&&nextSource!==nextTarget)void run(async()=>{setMerge(await inspectMerge(nextSource,nextTarget))},'')
+  }
   const edit=(eventId:string|null)=>{
     const e=data.events.find(r=>r.id===eventId)
     setId(eventId);setDraft(e?{name:e.name,date:e.date,openingCash:String(e.openingCash)}:emptyEvent());setMode('edit');setMessage('')
@@ -61,11 +66,11 @@ export default function EventManager({data}:{data:EventData}){
     {removal&&<><p><strong>{removal.name}（{removal.date}）</strong></p><p>商品 {removal.products}件 ／ セット {removal.bundles}件 ／ 写真 {removal.photos}件 ／ 会計 {removal.sales}件 ／ 在庫履歴 {removal.movements}件</p><p>売上 ¥{removal.total.toLocaleString()}。関連データも削除されます。事前にバックアップを保存してください。</p><label className="event-check"><input type="checkbox" disabled={busy} checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/>削除内容を確認しました</label></>}
     <div className="actions"><button disabled={busy} onClick={()=>{setMode('list');setMessage('')}}>キャンセル</button><button className="danger" disabled={busy||!confirmed||!removal} onClick={()=>{if(removal)void run(async()=>{await deleteEvent(removal);setMode('list');setRemoval(null)},'イベントを削除しました')}}>削除確定</button></div></div>}
   {mode==='merge'&&<div className="cancel-confirm"><h3>イベントのマージ</h3>
-    <label>統合元（削除されるイベント）<select value={source} disabled={busy} onChange={e=>{setSource(e.target.value);if(e.target.value===target)setTarget('');setMerge(null);setConfirmed(false);setMessage('')}}><option value="">選択してください</option>{data.events.map(e=><option key={e.id} value={e.id}>{e.name}（{e.date}）</option>)}</select></label>
-    <label>統合先（残すイベント）<select value={target} disabled={busy} onChange={e=>{setTarget(e.target.value);setMerge(null);setConfirmed(false);setMessage('')}}><option value="">選択してください</option>{data.events.filter(e=>e.id!==source).map(e=><option key={e.id} value={e.id}>{e.name}（{e.date}）</option>)}</select></label>
-    <button disabled={busy||!source||!target||source===target} onClick={()=>void run(async()=>{setMerge(null);setConfirmed(false);setMerge(await inspectMerge(source,target))},'照合完了')}>比較</button>
+    <label>統合元（削除されるイベント）<select value={source} disabled={busy} onChange={e=>changeMergeSelection(e.target.value,e.target.value===target?'':target)}><option value="">選択してください</option>{data.events.map(e=><option key={e.id} value={e.id}>{e.name}（{e.date}）</option>)}</select></label>
+    <label>統合先（残すイベント）<select value={target} disabled={busy} onChange={e=>changeMergeSelection(source,e.target.value)}><option value="">選択してください</option>{data.events.filter(e=>e.id!==source).map(e=><option key={e.id} value={e.id}>{e.name}（{e.date}）</option>)}</select></label>
+    {busy&& !merge&&<p className="muted" role="status">比較中…</p>}
     {merge&&<><p className={merge.keep==='blocked'?'sale-error':'inventory-notice'}>{merge.reason}</p><p>統合元：{merge.source.name} ／ 商品 {merge.source.products+merge.source.bundles}種類 ／ 会計 {merge.source.sales}件 ／ 売上 ¥{merge.source.total.toLocaleString()}</p><p>統合先：{merge.target.name} ／ 商品 {merge.target.products+merge.target.bundles}種類 ／ 会計 {merge.target.sales}件 ／ 売上 ¥{merge.target.total.toLocaleString()}</p>{merge.keep!=='blocked'&&<><p>統合後は「{merge.target.name}」のみ残ります。売上・在庫を合算しません。事前にバックアップを保存してください。</p><label className="event-check"><input type="checkbox" disabled={busy} checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/>統合内容を確認しました</label></>}</>}
-    <div className="actions"><button disabled={busy} onClick={()=>{setMode('list');setMessage('')}}>キャンセル</button><button className="primary" disabled={busy||!merge||merge.keep==='blocked'||!confirmed} onClick={()=>{if(merge)void run(async()=>{await mergeEvents(merge);setMerge(null);setMode('list')},'イベントを統合しました')}}>統合</button></div>
+    <div className="actions merge-actions"><button disabled={busy} onClick={()=>{setMode('list');setMessage('')}}>キャンセル</button><button className="primary" disabled={busy||!merge||merge.keep==='blocked'||!confirmed} onClick={()=>{if(merge)void run(async()=>{await mergeEvents(merge);setMerge(null);setMode('list')},'イベントを統合しました')}}>統合</button></div>
   </div>}
   {mode==='list'&&<><div className="line"><strong>{data.events.length}件</strong><div className="event-toolbar"><button className="primary" disabled={busy} onClick={()=>edit(null)}>＋ 新規イベント</button><button disabled={busy||data.events.length<2} onClick={()=>{setSource('');setTarget('');setMerge(null);setConfirmed(false);setMessage('');setMode('merge')}}>マージ</button><button disabled={busy||!data.events.length} onClick={()=>{setSource('');setRemoval(null);setConfirmed(false);setMessage('');setMode('delete')}}>削除</button></div></div>
     {!data.events.length&&<p>イベントを登録してください。</p>}
