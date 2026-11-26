@@ -1,9 +1,10 @@
+import NumberInput from '../components/NumberInput'
 import { useEffect, useState } from 'react'
 import { liveQuery } from 'dexie'
 import { loadCatalog, saveItem, deleteItem, moveItem, resizePhoto } from '../services/catalog'
 import type { Kind, Item, Draft } from '../services/catalog'
 
-const empty = (): Draft => ({ name: '', price: '', stock: '0', components: {} })
+const empty = (): Draft => ({ name: '', price: '0', stock: '0', components: {} })
 const yen = (n: number) => '¥' + n.toLocaleString('ja-JP')
 function Photo({ blob }: { blob?: Blob }) {
   const [url, setUrl] = useState('')
@@ -51,12 +52,12 @@ export default function ProductManager({ eventId }: { eventId: string }) {
       <h3>{id ? '商品編集' : '新規登録'}</h3>
       <fieldset disabled={busy}>
       <label htmlFor="master-name">商品名</label><input id="master-name" required maxLength={100} value={draft.name} onChange={e => setDraft(d => ({ ...d, name: e.target.value }))} />
-      <label htmlFor="master-price">販売価格（円）</label><input id="master-price" type="number" inputMode="numeric" min="0" max="99999999" step="1" required value={draft.price} onChange={e => setDraft(d => ({ ...d, price: e.target.value }))} />
-      {kind==='product' && <><label htmlFor="master-stock">初期在庫</label><input id="master-stock" type="number" min="0" max="999999" step="1" required inputMode="numeric" value={draft.stock} onChange={e=>setDraft(d=>({...d,stock:e.target.value}))}/></>}
+      <label htmlFor="master-price">販売価格（円）</label><NumberInput id="master-price" inputMode="numeric" min="0" max="99999999" step="1" required value={draft.price} onValueChange={value => setDraft(d => ({ ...d, price: value }))} />
+      {kind==='product' && <><label htmlFor="master-stock">初期在庫</label><NumberInput id="master-stock" min="0" max="999999" step="1" required inputMode="numeric" value={draft.stock} onValueChange={value =>setDraft(d=>({...d,stock:value}))}/></>}
       <label htmlFor="master-photo">商品写真</label><Photo blob={photo === undefined ? imageFor(current) : photo ?? undefined} />
       <input id="master-photo" type="file" accept="image/*" onChange={e => { const file = e.target.files?.[0]; e.target.value = ''; if (file) void perform(async () => setPhoto(await resizePhoto(file)), '画像を選択しました（保存前）') }} />
       <button type="button" onClick={() => setPhoto(null)}>写真を削除</button>
-      {kind === 'bundle' && <><h3>セット構成</h3>{catalog.products.length === 0 && <p>先に単品商品を登録してください。</p>}{catalog.products.map(p => <div className="master-component" key={p.id}><label htmlFor={'component-' + p.id}>{p.name}</label><input id={'component-' + p.id} type="number" inputMode="numeric" min="0" max="9999" step="1" value={draft.components[p.id] ?? ''} placeholder="0" onChange={e => setDraft(d => ({ ...d, components: { ...d.components, [p.id]: e.target.value } }))} /></div>)}</>}
+      {kind === 'bundle' && <><h3>セット構成</h3>{catalog.products.length === 0 && <p>先に単品商品を登録してください。</p>}{catalog.products.map(p => <div className="master-component" key={p.id}><label htmlFor={'component-' + p.id}>{p.name}</label><NumberInput id={'component-' + p.id} inputMode="numeric" min="0" max="9999" step="1" value={draft.components[p.id] ?? ''} placeholder="0" onValueChange={value => setDraft(d => ({ ...d, components: { ...d.components, [p.id]: value } }))} /></div>)}</>}
       <div className="actions"><button type="button" onClick={() => setEditing(false)}>取消</button><button className="primary" type="submit">保存</button></div>
       </fieldset>
     </form> : <><div className="line"><strong>{rows.length}件</strong><button className="primary" disabled={busy} onClick={() => start()}>＋ 新規登録</button></div>
