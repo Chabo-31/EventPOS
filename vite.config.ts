@@ -6,5 +6,8 @@ export default defineConfig({
     plugins: [plugin()],
     server: {
         port: 51114,
-    }
-})
+        watch: {
+            ignored: ['**/.vs/**'],
+        },
+    },
+});
