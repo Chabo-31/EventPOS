@@ -4,7 +4,6 @@ import EventManager from './pages/EventManager'
 import { loadEvents, eventItems, canAdd, itemKey } from './services/events'
 import type { EventData, EventItem } from './services/events'
 import './App.css'
-import ProductManager from './pages/ProductManager'
 import { checkDatabase } from './database/diagnostics'
 
 const tabs = ['会計', '在庫', 'イベント', '設定'] as const
@@ -70,7 +69,7 @@ function App() {
       <header className="app-header"><div><h1>EventPOS</h1><p>{active ? active.name + ' · ' + active.date : 'イベント未選択'}</p></div><span className="preview-label">会計保存は未実装</span></header>
       <main className="workspace">{loadError && <p role="alert">読み込み失敗：{loadError}</p>}{!data && !loadError && <p>読み込み中…</p>}
         {tab === '会計' && <div className="checkout">
-          <section className="catalog"><h2>商品選択</h2>{!active && <p className="muted">イベントタブで販売対象を登録・選択してください。</p>}{active && !products.length && <p className="muted">イベントに商品を紐づけてください。</p>}<div className="product-grid">{products.map(p => <article key={itemKey(p)} className={'product-card' + (amount(p) ? ' selected' : '')}>
+          <section className="catalog"><h2>商品選択</h2>{!active && <p className="muted">イベントタブで販売対象を登録・選択してください。</p>}{active && !products.length && <p className="muted">イベントタブで商品を登録してください。</p>}<div className="product-grid">{products.map(p => <article key={itemKey(p)} className={'product-card' + (amount(p) ? ' selected' : '')}>
             <button className="product-image"  onClick={() => adjust(p, 1)} disabled={!canAdd(products, qty, p)} aria-label={p.name + 'を追加'}><ItemPhoto blob={p.image} /></button>
             <div className="product-body"><h3>{p.name}{p.kind === "bundle" && <small> セット</small>}</h3><div className="product-meta"><strong>{yen(p.price)}</strong><small>在庫 {p.stock}</small></div>
             <div className="quantity"><button onClick={() => adjust(p, -1)} disabled={!amount(p)} aria-label={p.name + 'を減らす'}>−</button><strong>{amount(p)}</strong><button onClick={() => adjust(p, 1)} disabled={!canAdd(products, qty, p)} aria-label={p.name + 'を増やす'}>＋</button></div></div>
@@ -85,7 +84,7 @@ function App() {
         </div>}
         {tab === '在庫' && <section className="panel"><h2>在庫管理</h2><p className="muted">在庫追加は後続Phaseで実装します。</p>{active && <p>釣銭準備金：{yen(active.openingCash)}</p>}{products.map(p => <div className="inventory-row" key={itemKey(p)}><span>{p.name}</span><strong>{p.stock}点</strong><button disabled>在庫追加</button></div>)}</section>}
         {tab === 'イベント' && data && <EventManager data={data} />}
-        {tab === '設定' && <section className="panel"><h2>設定</h2><ProductManager />{['バックアップ出力', 'インポート'].map(label => <div className="line setting-row" key={label}><span>{label}</span><button disabled>準備中</button></div>)}<p className="muted">各機能は後続Phaseで実装します。</p><h3>データベース診断</h3><button onClick={() => void runDiagnostics()} disabled={dbBusy}>{dbBusy ? "診断中…" : "保存・復元テスト"}</button><div role="status" aria-live="polite">{dbReport.map((line, i) => <p key={i}>{line}</p>)}</div></section>}
+        {tab === '設定' && <section className="panel"><h2>設定</h2>{['バックアップ出力', 'インポート'].map(label => <div className="line setting-row" key={label}><span>{label}</span><button disabled>準備中</button></div>)}<p className="muted">各機能は後続Phaseで実装します。</p><h3>データベース診断</h3><button onClick={() => void runDiagnostics()} disabled={dbBusy}>{dbBusy ? "診断中…" : "保存・復元テスト"}</button><div role="status" aria-live="polite">{dbReport.map((line, i) => <p key={i}>{line}</p>)}</div></section>}
       </main>
       <nav className="navigation" aria-label="メインメニュー">{tabs.map(t => <button key={t} aria-current={tab === t ? 'page' : undefined} className={tab === t ? 'active' : ''} onClick={() => { if (t === 'イベント') reset(); setTab(t) }}><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={navPaths[t]} /></svg><span>{t}</span></button>)}</nav>
     </div>
